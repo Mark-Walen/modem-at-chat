@@ -250,11 +250,11 @@ char *grow(char *s, char **p, size_t len)
 }
 
 /*
- * chat [ -v ] [ -E ] [ -T number ] [ -U number ] [ -t timeout ] [ -f chat-file ] \
+ * chat -p serial-port [ -v ] [ -E ] [ -T number ] [ -U number ] [ -t timeout ] * [ -f chat-file ]\
  * [ -r report-file ] \
  *		[...[[expect[-say[-expect...]] say expect[-say[-expect]] ...]]]
  *
- *	Perform a UUCP-dialer-like chat script on stdin and stdout.
+ *	Perform a UUCP-dialer-like chat script on specific serial port.
  */
 int main(int argc, char **argv)
 {
@@ -290,6 +290,13 @@ int main(int argc, char **argv)
 
         case 'S':
             to_log = 0;
+            break;
+
+        case 'p':
+            if ((arg = OPTARG(argc, argv)) != NULL)
+                port = copy_of(arg);
+            else
+                usage();
             break;
 
         case 'f':
@@ -361,6 +368,21 @@ int main(int argc, char **argv)
 
     init();
 
+    if (port != NULL)
+    {
+        fprintf(report_fp, "Opening port %s\r\n", port);
+        port_fd = open(port, O_RDWR | O_NONBLOCK | O_NOCTTY);
+        if (port_fd < 0)
+        {
+            fprintf(report_fp, "Unable to open port %s\r\n", port);
+        }
+    }
+    else
+    {
+        fprintf(report_fp, "Error: Serial port is required.\r\n");
+        usage();
+    }
+    
     if (chat_file != NULL)
     {
         arg = ARG(argc, argv);
@@ -452,9 +474,13 @@ void do_file(char *chat_file)
                 *sp++ = '\0';
 
             if (sendflg)
+            {
                 chat_send(arg);
+            }
             else
+            {
                 chat_expect(arg);
+            }
             sendflg = !sendflg;
             checksigs();
         }
@@ -469,8 +495,8 @@ void do_file(char *chat_file)
 void usage(void)
 {
     fprintf(stderr, "\
-Usage: %s [-e] [-E] [-v] [-V] [-t timeout] [-r report-file]\n\
-     [-T phone-number] [-U phone-number2] {-f chat-file | chat-script}\n",
+Usage: %s -p serial-port [-e] [-E] [-v] [-V] [-t timeout] [-r report-file]\r\n\
+     [-T phone-number] [-U phone-number2] {-f chat-file | chat-script}\r\n",
             program_name);
     exit(1);
 }
@@ -642,6 +668,15 @@ void terminate(int status)
         report_buffer[rep_len] = 0;
         fprintf(report_fp, "chat:  %s\n", report_buffer);
     }
+
+    if (port != (char *) 0 && port_fd > 0)
+    {
+        if (verbose)
+            fprintf(report_fp, "Closing port %s.\n", port);
+        close(port_fd);
+        port_fd = 0;
+    }
+
     if (report_file != (char *)0 && report_fp != (FILE *)NULL)
     {
         if (verbose)
@@ -1201,8 +1236,8 @@ int chat_send(register char *s)
         free(s);
         return 0;
     }
-
     /*
+
      * The syntax @filename means read the string to send from the
      * file `filename'.
      */
@@ -1249,7 +1284,6 @@ int chat_send(register char *s)
 
     if (!put_string(s))
         fatal(1, "Failed");
-
     return 0;
 }
 
@@ -1258,7 +1292,10 @@ int get_char(void)
     int status;
     char c;
 
-    status = read(0, &c, 1);
+    status = read(port_fd, &c, 1);
+    checksigs();
+
+    write(1, &c, 1);
     checksigs();
 
     switch (status)
@@ -1280,6 +1317,9 @@ int put_char(int c)
     char ch = c;
 
     usleep(10000); /* inter-character typing delay (?) */
+    checksigs();
+
+    write(port_fd, &ch, 1);
     checksigs();
 
     status = write(1, &ch, 1);

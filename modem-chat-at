@@ -1,0 +1,17 @@
+# 连续5秒，收到以下字符，则退出执行
+# 进行超时控制,增加对特殊情况的处理，加入下面字段
+TIMEOUT 5
+ABORT   "BUSY"
+ABORT   "ERROR"
+ABORT   "NO ANSWER"
+ABORT   "NO CARRTER"
+ABORT   "NO DIALTONE"
+ 
+#一个chat脚本都是由字符串对来组成的。前面的字符串都是期望获取的串，紧跟的是发送的字符串
+# 例如 ""AT,不管收到什么字符串，先发出字符串AT
+#      OK \rATZ,发送ATZ，希望收到的是OK
+"" AT\r\n
+OK ATZ\r\n
+OK AT+QCFG="usbnet",1\r\n
+OK AT+QNETDEVCTL=1,1,1\r\n
+OK
