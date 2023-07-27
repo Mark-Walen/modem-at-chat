@@ -81,9 +81,6 @@
  *		(614)451-1883
  *
  */
-#define _XOPEN_SOURCE 700
-#define _DEFAULT_SOURCE
-
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
@@ -174,7 +171,7 @@ struct termio saved_tty_parameters;
 #define term_parms struct termios
 #define get_term_param(fd, param) tcgetattr(0, param)
 #define set_term_param(fd, param) tcsetattr(0, TCSANOW, param)
-struct termios saved_tty_parameters;
+struct termios saved_tty_parameters, saved_tty_parameters_teminal;
 #endif
 
 char *abort_string[MAX_ABORTS], *fail_reason = (char *)0,
@@ -498,7 +495,7 @@ void usage(void)
 Usage: %s -p serial-port [-e] [-E] [-v] [-V] [-t timeout] [-r report-file]\r\n\
      [-T phone-number] [-U phone-number2] {-f chat-file | chat-script}\r\n",
             program_name);
-    exit(1);
+    terminate(1);
 }
 
 char line[1024];
@@ -611,7 +608,7 @@ void init(void)
 void set_tty_parameters(void)
 {
 #if defined(get_term_param)
-    term_parms t;
+    term_parms t, t2;
 
     if (get_term_param(port_fd, &t) < 0)
         fatal(2, "Can't get terminal parameters: %m");
